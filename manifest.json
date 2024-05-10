@@ -2,12 +2,14 @@
   "manifest_version": 3,
   "name": "Screenshot Extension for Interview Helper",
   "short_name": "Screenshot Extension",
-  "version": "1.2",
-  "permissions": ["activeTab"],
+  "version": "1.3",
+  "permissions": ["activeTab","commands","storage"],
   "commands": {
     "capture-screenshot": {
       "suggested_key": {
-        "default": "Alt+Shift+4"
+        "mac": "Command+Shift+1",
+        "windows": "Ctrl+Shift+1",
+        "linux": "Ctrl+Shift+1"
       },
       "description": "Take a screenshot"
     }
@@ -24,4 +26,3 @@
     "service_worker": "background.js"
   }
 }
-

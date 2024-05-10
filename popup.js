@@ -30,11 +30,13 @@ document.addEventListener("DOMContentLoaded", () => {
       lang: langInput.value,
     };
     localStorage.setItem("extensionSettings", JSON.stringify(newSettings));
+    chrome.runtime.sendMessage({ settings: newSettings });
+
 
     // Optionally hide input fields after saving
-    tgidInput.style.display = "none";
-    hashInput.style.display = "none";
-    langInput.style.display = "none";
+    //tgidInput.style.display = "none";
+    //hashInput.style.display = "none";
+    // langInput.style.display = "non
 
     // Enable capture button after saving
     captureButton.disabled = false;
