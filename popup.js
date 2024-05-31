@@ -1,85 +1,38 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const captureButton = document.getElementById("captureButton");
-  const saveButton = document.getElementById("saveButton");
-  const tgidInput = document.getElementById("tgidInput");
-  const hashInput = document.getElementById("hashInput");
-  const langInput = document.getElementById("langInput");
+document.getElementById('saveButton').addEventListener('click', () => {
+  const tgid = document.getElementById('tgidInput').value;
+  const hash = document.getElementById('hashInput').value;
+  const lang = document.getElementById('langInput').value;
 
-  // Load saved settings from local storage
-  const savedSettings = JSON.parse(localStorage.getItem("extensionSettings")) || {};
-  tgidInput.value = savedSettings.tgid || "";
-  hashInput.value = savedSettings.hash || "";
-  langInput.value = savedSettings.lang || "";
+  const settings = { tgid, hash, lang };
+  console.log("Saving settings:", settings);
 
-  // Enable/disable capture button based on input values
-  function updateCaptureButtonState() {
-    captureButton.disabled = !(tgidInput.value && hashInput.value && langInput.value);
-  }
-
-  // Update button state when inputs change
-  tgidInput.addEventListener("input", updateCaptureButtonState);
-  hashInput.addEventListener("input", updateCaptureButtonState);
-  langInput.addEventListener("input", updateCaptureButtonState);
-
-  // Save button click event
-  saveButton.addEventListener("click", () => {
-    // Save user input to local storage
-    const newSettings = {
-      tgid: tgidInput.value,
-      hash: hashInput.value,
-      lang: langInput.value,
-    };
-    localStorage.setItem("extensionSettings", JSON.stringify(newSettings));
-    chrome.runtime.sendMessage({ settings: newSettings });
-
-
-    // Optionally hide input fields after saving
-    //tgidInput.style.display = "none";
-    //hashInput.style.display = "none";
-    // langInput.style.display = "non
-
-    // Enable capture button after saving
-    captureButton.disabled = false;
+  chrome.storage.local.set({ extensionSettings: settings }, () => {
+    if (chrome.runtime.lastError) {
+      console.error("Error saving settings:", chrome.runtime.lastError);
+    } else {
+      console.log("Settings saved successfully.");
+      document.getElementById('captureButton').disabled = false;
+    }
   });
-
-  // Capture button click event
-  captureButton.addEventListener("click", () => {
-    // Capture visible tab as a PNG image
-    chrome.tabs.captureVisibleTab({ format: "png" }, (screenshotUrl) => {
-      if (chrome.runtime.lastError) {
-        console.error("Error capturing screenshot:", chrome.runtime.lastError);
-        return;
-      }
-
-      fetch(screenshotUrl)
-        .then((response) => response.blob())
-        .then((blob) => {
-          // Prepare the request body as FormData
-          const formData = new FormData();
-          formData.append("tgid", tgidInput.value);
-          formData.append("hash", hashInput.value);
-          formData.append("lang", langInput.value);
-          formData.append("image", blob, "screenshot.png");
-
-          // Make the HTTP POST request to the server
-          fetch("https://interviewhelpers.com:8443", {
-            method: "POST",
-            body: formData,
-          })
-            .then((response) => {
-              if (!response.ok) {
-                throw new Error("Network response was not ok");
-              }
-              // Handle the API response if needed
-            })
-            .catch((error) => {
-              console.error("Error sending data to the server:", error);
-            });
-        });
-    });
-  });
-
-  // Initial button state setup
-  updateCaptureButtonState();
 });
 
+document.getElementById('captureButton').addEventListener('click', () => {
+  chrome.runtime.sendMessage({ action: "capture-screenshot" });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  chrome.storage.local.get("extensionSettings", (result) => {
+    if (chrome.runtime.lastError) {
+      console.error("Error loading settings:", chrome.runtime.lastError);
+    } else {
+      const settings = result.extensionSettings || {};
+      console.log("Loaded settings:", settings);
+
+      if (settings.tgid) document.getElementById('tgidInput').value = settings.tgid;
+      if (settings.hash) document.getElementById('hashInput').value = settings.hash;
+      if (settings.lang) document.getElementById('langInput').value = settings.lang;
+
+      document.getElementById('captureButton').disabled = !settings.tgid || !settings.hash || !settings.lang;
+    }
+  });
+});
