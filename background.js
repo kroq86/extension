@@ -1,73 +1,92 @@
-// Listen for messages from popup.js
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("Received message from popup.js:", message);
-
-  // Check if the message contains settings
-  if (message.settings) {
-      console.log("Settings received:", message.settings);
-      
-      mergeWithServerSettings(message.settings)
-          .then(mergedData => {
-              console.log("Merged data:", mergedData);
-              captureScreenshot(mergedData);
-          })
-          .catch(error => {
-              console.error("Error merging settings with server settings:", error);
-          });
+    if (message.action === "capture-screenshot") {
+      console.log("Message action: capture-screenshot received");
+      loadSettingsFromChromeStorage()
+        .then(localSettings => mergeWithServerSettings(localSettings))
+        .then(mergedData => {
+          captureScreenshot(mergedData);
+        })
+        .catch(error => {
+          console.error("Error loading settings or capturing screenshot:", error);
+        });
+    }
+  });
+  
+  chrome.commands.onCommand.addListener((command) => {
+    console.log("Command received:", command);
+    if (command === "capture-screenshot") {
+      console.log("Keybinding triggered: capture-screenshot");
+      loadSettingsFromChromeStorage()
+        .then(localSettings => mergeWithServerSettings(localSettings))
+        .then(mergedData => {
+          captureScreenshot(mergedData);
+        })
+        .catch(error => {
+          console.error("Error loading settings or capturing screenshot:", error);
+        });
+    }
+  });
+  
+  function loadSettingsFromChromeStorage() {
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.get("extensionSettings", (result) => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+        } else {
+          console.log("Loaded settings from Chrome storage:", result.extensionSettings);
+          resolve(result.extensionSettings || {});
+        }
+      });
+    });
   }
-});
-
-function mergeWithServerSettings(userSettings) {
-  // Fetch server settings and merge with user settings
-  return fetch(chrome.runtime.getURL('server-settings.json'))
+  
+  function mergeWithServerSettings(userSettings) {
+    return fetch(chrome.runtime.getURL('server-settings.json'))
       .then(response => response.json())
       .then(serverSettings => {
-          const mergedSettings = {
-              tgid: userSettings.tgid || serverSettings.tgid,
-              hash: userSettings.hash || serverSettings.hash,
-              lang: userSettings.lang || serverSettings.lang
-          };
-          console.log("Merged settings:", mergedSettings);
-          return mergedSettings;
+        const mergedSettings = {
+          tgid: userSettings.tgid || serverSettings.tgid,
+          hash: userSettings.hash || serverSettings.hash,
+          lang: userSettings.lang || serverSettings.lang
+        };
+        console.log("Merged settings:", mergedSettings);
+        return mergedSettings;
       });
-}
-
-function captureScreenshot(mergedData) {
-  console.log("Capturing screenshot with data:", mergedData);
-
-  // Capture visible tab as a PNG image
-  chrome.tabs.captureVisibleTab({ format: "png" }, (screenshotUrl) => {
-      console.log("Screenshot URL:", screenshotUrl);
-
+  }
+  
+  function captureScreenshot(mergedData) {
+    console.log("Capturing screenshot with data:", mergedData);
+  
+    chrome.tabs.captureVisibleTab({ format: "png" }, (screenshotUrl) => {
       if (chrome.runtime.lastError) {
-          console.error("Error capturing screenshot:", chrome.runtime.lastError);
-          return;
+        console.error("Error capturing screenshot:", chrome.runtime.lastError);
+        return;
       }
-
+  
+      console.log("Screenshot URL:", screenshotUrl);
       fetch(screenshotUrl)
-          .then((response) => response.blob())
-          .then((blob) => {
-              // Prepare the request body as FormData
-              const formData = new FormData();
-              formData.append("tgid", mergedData.tgid);
-              formData.append("hash", mergedData.hash);
-              formData.append("lang", mergedData.lang);
-              formData.append("image", blob, "screenshot.png");
-
-              // Make the HTTP POST request to the server
-              fetch("https://interviewhelpers.com:8443", {
-                  method: "POST",
-                  body: formData,
-              })
-                  .then((response) => {
-                      if (!response.ok) {
-                          throw new Error("Network response was not ok");
-                      }
-                      // Handle the API response if needed
-                  })
-                  .catch((error) => {
-                      console.error("Error sending data to the server:", error);
-                  });
+        .then(response => response.blob())
+        .then(blob => {
+          const formData = new FormData();
+          formData.append("tgid", mergedData.tgid);
+          formData.append("hash", mergedData.hash);
+          formData.append("lang", mergedData.lang);
+          formData.append("image", blob, "screenshot.png");
+  
+          return fetch("https://interviewhelpers.com:8443", {
+            method: "POST",
+            body: formData,
           });
-  });
-}
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error("Failed to send data to the server");
+          }
+          console.log("Successfully sent data to the server");
+        })
+        .catch(error => {
+          console.error("Error sending data to the server:", error);
+        });
+    });
+  }
+  
